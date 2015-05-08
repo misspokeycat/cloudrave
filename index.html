@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cloud Rave!</title>
+</head>
+  <script src="http://code.jquery.com/jquery-2.1.3.min.js"></script>
+<body bgcolor="black">
+  <div id="rdiv" style="
+    height: 100%;
+    width: 33%;
+    float: left;
+    position: absolute;
+"></div>
+<div id="gdiv" style="
+    height: 100%;
+    width: 33%;
+    float: left;
+    margin-left: 33%;
+    position: absolute;
+"></div>
+<div id="bdiv" style="
+    height: 100%;
+    width: 33%;
+    margin-left: 66%;
+    float: left;
+    position: absolute;
+"></div>
+  <input id='url' type='text'><button id='playurl'>Start the party</button>
+  <canvas id='canvas' height=1000 width=1600>
+  </canvas>
+  <script type="text/javascript">
+    $(window).load(function(){
+      $(playurl).click(function(){
+        $.getJSON("https://api.soundcloud.com/resolve.json?url="
+          + $('#url').val()
+          +"&client_id=5172848d14805a5143fdd0c8ae00aba3", function(data){
+            console.log(data.id);
+            var context = new AudioContext();
+            var analyser = context.createAnalyser();
+            analyser.fftSize = 512;
+            analyser.smoothingTimeConstant = .8;
+              var cv = document.getElementById('canvas');
+              var WIDTH = 1600,
+                HEIGHT = 1000;
+              var ctx = cv.getContext('2d');
+              var bufferLength = analyser.frequencyBinCount;
+              console.log(bufferLength);
+              var dataArray = new Uint8Array(bufferLength);
+              var rsecshot = [0];
+              var gsecshot = [0];
+              var bsecshot = [0];
+              var total = 0;
+              var iterations = 0;
+              var rsecavg = 0;
+              var gsecavg = 0;
+              var bsecavg = 0;
+              ctx.clearRect(0,0,WIDTH, HEIGHT);
+              function draw(){
+                drawVisual = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(dataArray);
+                ctx.fillStyle = 'rgb(0, 0, 0)';
+                ctx.clearRect(0,0, WIDTH, HEIGHT);
+                var barWidth = (WIDTH/ bufferLength);
+                var barHeight;
+                var x = 0;
+                var raverage = 0;
+                var gaverage = 0;
+                var baverage = 0;
+                var DATASET_SIZE = 30;
+                var runningavg = 127;
+                for(var i = 0; i < bufferLength; i++) {
+                  barHeight = ((dataArray[i])-runningavg)/256*HEIGHT;
+                  ctx.fillStyle = 'rgb(255,255,255)';
+                  ctx.fillRect(x,HEIGHT-barHeight,barWidth,barHeight);
+                  x += barWidth + 1;
+                  if (i<5){
+                    raverage += dataArray[i];
+                  } else if(i<100){
+                    gaverage += dataArray[i];
+                  } else if ((i>160) && (i<200)){
+                    baverage += dataArray[i]
+                  }
+                }
+                function rgbToHex(R,G,B) {return toHex(R)+toHex(G)+toHex(B)}
+                function toHex(n) {
+                 n = parseInt(n,10);
+                 if (isNaN(n)) return "00";
+                 n = Math.max(0,Math.min(n,255));
+                 return "0123456789ABCDEF".charAt((n-n%16)/16)
+                      + "0123456789ABCDEF".charAt(n%16);
+                }
+                raverage = raverage/5;
+                gaverage = gaverage/100;
+                baverage = baverage/40;
+                if (iterations < 60){
+                  rsecshot[iterations] = raverage;
+                }else{
+                  var copytab = rsecshot.slice(0);
+                  var sum = 0;
+                  for(var i=0; i<60; i++){
+                    rsecshot[i] = copytab[i+1]
+                    sum += rsecshot[i];
+                  }
+                  rsecavg = sum/61;
+                  rsecshot[60] = raverage;
+                }
+
+                if (iterations < 60){
+                  bsecshot[iterations] = baverage;
+                }else{
+                  var copytab = bsecshot.slice(0);
+                  var sum = 0;
+                  for(var i=0; i<60; i++){
+                    bsecshot[i] = copytab[i+1]
+                    sum += bsecshot[i];
+                  }
+                  bsecavg = sum/61;
+                  bsecshot[60] = baverage;
+                }
+
+                if (iterations < 60){
+                  gsecshot[iterations] = gaverage;
+                }else{
+                  var copytab = gsecshot.slice(0);
+                  var sum = 0;
+                  for(var i=0; i<60; i++){
+                    gsecshot[i] = copytab[i+1]
+                    sum += gsecshot[i];
+                  }
+                  gsecavg = sum/61;
+                  gsecshot[60] = gaverage;
+                }
+                iterations++;
+                runningavg = total/iterations;
+                //console.log(average - secavg);
+                var rflashval = (raverage - rsecavg) * 20;
+                var gflashval = (gaverage - gsecavg) * 20;
+                var bflashval = (baverage - bsecavg) * 20;
+                // if (average-runningavg > 3.5){
+                //  $('body').attr('bgcolor', rgbToHex(255, 255, 255));
+                //} else{
+                  $('body').attr('bgcolor', rgbToHex(rflashval, gflashval, bflashval));
+                //$("#rdiv").css('background', '#'+toHex(rflashval)+"0000");
+               // $("#gdiv").css('background', '#'+"00"+toHex(gflashval)+"00");
+               // $("#bdiv").css('background', '#'+"0000"+toHex(bflashval));
+               // }
+              };
+              draw();
+                                  
+            var audio = new Audio();
+            url = 'http://api.soundcloud.com/tracks/'+ data.id + '/stream' +
+                '?client_id=5172848d14805a5143fdd0c8ae00aba3';
+            audio.src = url;
+            audio.crossOrigin="anonymous";
+            source = context.createMediaElementSource(audio);
+            source.connect(analyser);
+            analyser.connect(context.destination);
+            source.mediaElement.play();
+          });
+      });
+    });
+  </script>
+</body>
+</html>
